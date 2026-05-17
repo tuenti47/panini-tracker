@@ -185,8 +185,49 @@
     .btn-sm:hover { border-color: var(--green); color: var(--green); }
     .btn-sm.danger:hover { border-color: #dc2626; color: #dc2626; }
 
-    @media (max-width: 480px) {
-      .grid { grid-template-columns: 1fr; padding: 10px; }
+    /* ── MOBILE ── */
+    @media (max-width: 600px) {
+      .app-header { padding: 10px 12px 12px; }
+      .app-header h1 { font-size: .95rem; }
+      .app-header h1 span { font-size: .7rem; }
+      .user-badge { padding: 4px 8px 4px 6px; font-size: .78rem; }
+      #globalPct { font-size: 1.2rem; }
+
+      .global-stats { gap: 6px; }
+      .stat-chip { font-size: .72rem; padding: 3px 8px; }
+
+      .controls { padding: 8px 10px; gap: 6px; flex-wrap: nowrap; }
+      .search-wrap { min-width: 0; }
+      select { font-size: .78rem; padding: 7px 6px; max-width: 130px; }
+
+      .grid { grid-template-columns: 1fr; padding: 8px; gap: 8px; }
+
+      .card-flag { font-size: 1.3rem; }
+      .card-name { font-size: .88rem; }
+      .card-count { font-size: .72rem; }
+      .card-pct { font-size: .82rem; }
+      .card-header { padding: 8px 10px 7px; gap: 8px; }
+
+      .stickers { padding: 8px 10px 10px; gap: 6px; }
+      .sticker { width: 38px; height: 38px; font-size: .78rem; border-radius: 7px; }
+
+      .familia-list { padding: 10px; gap: 8px; }
+      .familia-card { padding: 12px 14px; gap: 10px; }
+      .familia-avatar { width: 40px; height: 40px; font-size: 1rem; }
+      .familia-name { font-size: .9rem; }
+      .familia-pct { font-size: .95rem; }
+
+      .tab-btn { font-size: .65rem; }
+      .tab-btn svg { width: 20px; height: 20px; }
+      --tab-h: 56px;
+
+      .footer-actions { padding: 10px; gap: 6px; }
+      .btn-sm { font-size: .78rem; padding: 7px 10px; }
+
+      /* Auth */
+      .auth-card { padding: 24px 20px; }
+      .auth-logo .ball { font-size: 2.5rem; }
+      .auth-logo h2 { font-size: 1.15rem; }
     }
   </style>
 </head>
