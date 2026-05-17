@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16a34a">
+  <title>Album Panini ⚽ Mundial 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #16a34a; --green-dark: #15803d; --green-light: #f0fdf4;
+      --gray: #e5e7eb; --gray-dark: #6b7280; --text: #111827; --text-soft: #6b7280;
+      --border: #e5e7eb; --shadow: 0 1px 3px rgba(0,0,0,.1);
+      --tab-h: 60px;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; color: var(--text); min-height: 100vh; }
+
+    /* ── SPINNER ── */
+    #splash {
+      position: fixed; inset: 0; background: var(--green-dark);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; z-index: 999; transition: opacity .4s;
+    }
+    #splash h1 { color: #fff; font-size: 1.8rem; font-weight: 800; }
+    #splash p  { color: rgba(255,255,255,.7); font-size: .9rem; }
+    .spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── AUTH ── */
+    #authScreen {
+      min-height: 100vh; display: none;
+      background: linear-gradient(160deg, var(--green-dark) 0%, var(--green) 50%, #84cc16 100%);
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .auth-card {
+      background: #fff; border-radius: 20px; padding: 32px 28px;
+      width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .auth-logo { text-align: center; margin-bottom: 24px; }
+    .auth-logo .ball { font-size: 3rem; }
+    .auth-logo h2 { font-size: 1.3rem; font-weight: 800; color: var(--text); margin-top: 4px; }
+    .auth-logo p  { font-size: .82rem; color: var(--text-soft); margin-top: 2px; }
+    .auth-tabs { display: flex; background: var(--gray); border-radius: 10px; padding: 3px; margin-bottom: 20px; }
+    .auth-tab {
+      flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer;
+      border-radius: 8px; font-size: .88rem; font-weight: 600; color: var(--text-soft); transition: all .2s;
+    }
+    .auth-tab.active { background: #fff; color: var(--green); box-shadow: var(--shadow); }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: .82rem; font-weight: 600; color: var(--text-soft); margin-bottom: 5px; }
+    .field input {
+      width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: .95rem; outline: none; transition: border-color .2s;
+    }
+    .field input:focus { border-color: var(--green); }
+    .btn-primary {
+      width: 100%; padding: 13px; background: var(--green); color: #fff; border: none;
+      border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 6px;
+      transition: background .2s; letter-spacing: .3px;
+    }
+    .btn-primary:hover { background: var(--green-dark); }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    #authError { color: #dc2626; font-size: .82rem; text-align: center; margin-top: 10px; min-height: 20px; }
+
+    /* ── MAIN APP ── */
+    #appScreen { display: none; flex-direction: column; min-height: 100vh; }
+
+    /* HEADER */
+    .app-header {
+      background: linear-gradient(135deg, var(--green-dark) 0%, var(--green) 100%);
+      color: #fff; padding: 14px 16px 16px; position: sticky; top: 0; z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    .app-header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .app-header h1 { font-size: 1.1rem; font-weight: 800; }
+    .app-header h1 span { font-size: .75rem; font-weight: 400; opacity: .8; display: block; }
+    .user-badge {
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+      border-radius: 20px; padding: 5px 12px 5px 8px; cursor: pointer;
+      font-size: .82rem; font-weight: 600; transition: background .2s;
+    }
+    .user-badge:hover { background: rgba(255,255,255,.25); }
+    .user-avatar {
+      width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,.3);
+      display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700;
+    }
+    .global-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .stat-chip {
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.2);
+      border-radius: 20px; padding: 4px 10px; font-size: .78rem; font-weight: 600; white-space: nowrap;
+    }
+    #globalPct { font-size: 1.4rem; font-weight: 800; margin-left: auto; }
+    #syncBadge { font-size: .7rem; padding: 2px 8px; border-radius: 20px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.2); }
+    .prog-wrap { height: 6px; background: rgba(255,255,255,.2); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+    .prog-fill  { height: 100%; background: #fff; border-radius: 99px; transition: width .4s ease; }
+
+    /* TABS */
+    .tab-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; height: var(--tab-h);
+      background: #fff; border-top: 1px solid var(--border);
+      display: flex; z-index: 50; box-shadow: 0 -2px 8px rgba(0,0,0,.06);
+    }
+    .tab-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; border: none; background: transparent; cursor: pointer; font-size: .68rem;
+      font-weight: 600; color: var(--gray-dark); transition: color .2s; padding: 8px 0;
+    }
+    .tab-btn svg { width: 22px; height: 22px; }
+    .tab-btn.active { color: var(--green); }
+
+    /* TAB CONTENT */
+    .tab-content { flex: 1; padding-bottom: var(--tab-h); overflow-y: auto; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* CONTROLS */
+    .controls {
+      padding: 10px 14px; display: flex; gap: 8px; flex-wrap: wrap;
+      background: #fff; border-bottom: 1px solid var(--border); position: sticky;
+      top: 0; z-index: 40;
+    }
+    .search-wrap { position: relative; flex: 1; min-width: 160px; }
+    .search-wrap svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--gray-dark); pointer-events: none; }
+    input[type="search"] { width: 100%; padding: 8px 10px 8px 32px; border: 1.5px solid var(--border); border-radius: 8px; font-size: .88rem; outline: none; background: #f9fafb; }
+    input[type="search"]:focus { border-color: var(--green); background: #fff; }
+    select { padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: .83rem; background: #f9fafb; outline: none; cursor: pointer; }
+    select:focus { border-color: var(--green); }
+
+    /* GRID */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; padding: 14px; }
+    .card { background: #fff; border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--border); }
+    .card-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px 8px; border-bottom: 1px solid var(--border); }
+    .card-flag  { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
+    .card-info  { flex: 1; min-width: 0; }
+    .card-name  { font-weight: 700; font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-count { font-size: .75rem; color: var(--text-soft); }
+    .card-pct   { font-size: .85rem; font-weight: 700; color: var(--green); flex-shrink: 0; }
+    .card-prog  { height: 4px; background: var(--gray); }
+    .card-prog-fill { height: 100%; background: var(--green); transition: width .25s; }
+    .stickers { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px 12px 12px; }
+    .sticker {
+      width: 33px; height: 33px; border-radius: 6px; border: 1.5px solid var(--gray);
+      background: #f9fafb; color: var(--gray-dark); font-size: .73rem; font-weight: 600;
+      cursor: pointer; transition: all .12s; display: flex; align-items: center; justify-content: center;
+      user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .sticker:hover { border-color: var(--green); color: var(--green); }
+    .sticker.have { background: var(--green); border-color: var(--green); color: #fff; }
+    .sticker.have:hover { background: var(--green-dark); }
+
+    /* FAMILIA TAB */
+    .familia-list { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .familia-card {
+      background: #fff; border-radius: 14px; border: 1px solid var(--border);
+      padding: 14px 16px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 14px;
+    }
+    .familia-avatar {
+      width: 46px; height: 46px; border-radius: 50%; background: var(--green);
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+      font-weight: 800; color: #fff; flex-shrink: 0; text-transform: uppercase;
+    }
+    .familia-info { flex: 1; min-width: 0; }
+    .familia-name { font-weight: 700; font-size: .95rem; }
+    .familia-sub  { font-size: .78rem; color: var(--text-soft); margin-top: 1px; }
+    .familia-prog-wrap { height: 6px; background: var(--gray); border-radius: 99px; overflow: hidden; margin-top: 6px; }
+    .familia-prog-fill { height: 100%; background: var(--green); border-radius: 99px; transition: width .4s; }
+    .familia-pct { font-size: 1rem; font-weight: 800; color: var(--green); flex-shrink: 0; }
+    .familia-empty { text-align: center; padding: 48px 20px; color: var(--text-soft); font-size: .9rem; }
+    .familia-you { font-size: .65rem; background: var(--green-light); color: var(--green); padding: 2px 6px; border-radius: 10px; font-weight: 700; vertical-align: middle; margin-left: 5px; }
+    .refresh-btn {
+      display: flex; align-items: center; gap: 6px; margin: 10px 14px 0; padding: 9px 14px;
+      background: #fff; border: 1.5px solid var(--border); border-radius: 9px; cursor: pointer;
+      font-size: .83rem; font-weight: 600; color: var(--text-soft); width: fit-content;
+    }
+    .refresh-btn:hover { border-color: var(--green); color: var(--green); }
+
+    /* FOOTER ACTIONS */
+    .footer-actions { padding: 12px 14px 4px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-sm {
+      padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 8px; background: #fff;
+      font-size: .82rem; font-weight: 600; cursor: pointer; color: var(--text-soft); transition: all .15s;
+    }
+    .btn-sm:hover { border-color: var(--green); color: var(--green); }
+    .btn-sm.danger:hover { border-color: #dc2626; color: #dc2626; }
+
+    @media (max-width: 480px) {
+      .grid { grid-template-columns: 1fr; padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="ball" style="font-size:3rem">⚽</div>
+  <h1>Panini 2026</h1>
+  <div class="spinner"></div>
+  <p>Cargando…</p>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="ball">⚽</div>
+      <h2>Album Panini 2026</h2>
+      <p>Llevá el control de tus figuritas</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthMode('login')">Entrar</button>
+      <button class="auth-tab" onclick="switchAuthMode('register')">Crear cuenta</button>
+    </div>
+    <div class="field">
+      <label>Nombre de usuario</label>
+      <input type="text" id="authUsername" placeholder="ej: juan" autocomplete="username" autocapitalize="none">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="field" id="confirmField" style="display:none">
+      <label>Confirmar contraseña</label>
+      <input type="password" id="authConfirm" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <button class="btn-primary" id="authBtn" onclick="doAuth()">Entrar</button>
+    <div id="authError"></div>
+  </div>
+</div>
+
+<!-- MAIN APP SCREEN -->
+<div id="appScreen">
+
+  <header class="app-header">
+    <div class="app-header-top">
+      <h1>⚽ Panini 2026<span id="headerSub">Mundial de Fútbol</span></h1>
+      <div class="user-badge" onclick="confirmLogout()">
+        <div class="user-avatar" id="userInitial">?</div>
+        <span id="headerUser">—</span>
+      </div>
+    </div>
+    <div class="global-stats">
+      <div class="stat-chip">✅ <span id="statHave">0</span></div>
+      <div class="stat-chip">❌ <span id="statMiss">0</span> faltan</div>
+      <div class="stat-chip">📦 993</div>
+      <div id="globalPct">—</div>
+    </div>
+    <div id="syncBadge">⟳</div>
+    <div class="prog-wrap"><div class="prog-fill" id="globalBar" style="width:0%"></div></div>
+  </header>
+
+  <div class="tab-content">
+
+    <!-- TAB: MI ALBUM -->
+    <div class="tab-panel active" id="panel-album">
+      <div class="controls">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="search" id="searchInput" placeholder="Buscar país…" oninput="renderGrid()">
+        </div>
+        <select id="sortSelect" onchange="renderGrid()">
+          <option value="original">Orden original</option>
+          <option value="alpha">A → Z</option>
+          <option value="asc">Más faltan primero</option>
+          <option value="desc">Más completo primero</option>
+        </select>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="footer-actions">
+        <button class="btn-sm" onclick="exportJSON()">⬇ Exportar backup</button>
+        <button class="btn-sm" onclick="importJSON()">⬆ Importar backup</button>
+        <button class="btn-sm danger" onclick="resetConfirm()">Reiniciar album</button>
+      </div>
+      <div style="height:16px"></div>
+    </div>
+
+    <!-- TAB: FAMILIA -->
+    <div class="tab-panel" id="panel-familia">
+      <button class="refresh-btn" onclick="loadFamilia()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        Actualizar
+      </button>
+      <div class="familia-list" id="familiaList">
+        <div class="familia-empty">Cargando familia…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" id="tab-album" onclick="switchTab('album')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Mi Album
+    </button>
+    <button class="tab-btn" id="tab-familia" onclick="switchTab('familia')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Familia
+    </button>
+  </nav>
+
+</div>
+
+<script>
+// ── SUPABASE ──────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://nzxsufszbzckfyllzudd.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56eHN1ZnN6Ynpja2Z5bGx6dWRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NjY2NDIsImV4cCI6MjA5NDU0MjY0Mn0.KUaLGk-AFoy9D-yiCyhhbc7DZqmfHB1rdBbEgLx2PgY";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── SECTIONS DATA ─────────────────────────────────────────────────────────────
+const SECTIONS = [
+  { id:"mexico",       name:"México",          flag:"🇲🇽", total:20 },
+  { id:"surafrica",    name:"Sudáfrica",        flag:"🇿🇦", total:20 },
+  { id:"corea",        name:"Corea",            flag:"🇰🇷", total:20 },
+  { id:"checa",        name:"Rep. Checa",       flag:"🇨🇿", total:20 },
+  { id:"canada",       name:"Canadá",           flag:"🇨🇦", total:20 },
+  { id:"bosnia",       name:"Bosnia",           flag:"🇧🇦", total:20 },
+  { id:"qatar",        name:"Qatar",            flag:"🇶🇦", total:20 },
+  { id:"suiza",        name:"Suiza",            flag:"🇨🇭", total:20 },
+  { id:"brasil",       name:"Brasil",           flag:"🇧🇷", total:20 },
+  { id:"marruecos",    name:"Marruecos",        flag:"🇲🇦", total:20 },
+  { id:"haiti",        name:"Haití",            flag:"🇭🇹", total:20 },
+  { id:"escocia",      name:"Escocia",          flag:"🏴󠁧󠁢󠁳󠁣󠁴󠁿", total:20 },
+  { id:"usa",          name:"USA",              flag:"🇺🇸", total:20 },
+  { id:"paraguay",     name:"Paraguay",         flag:"🇵🇾", total:20 },
+  { id:"autralia",     name:"Australia",        flag:"🇦🇺", total:20 },
+  { id:"turquia",      name:"Turquía",          flag:"🇹🇷", total:20 },
+  { id:"alemania",     name:"Alemania",         flag:"🇩🇪", total:20 },
+  { id:"curacao",      name:"Curazao",          flag:"🇨🇼", total:20 },
+  { id:"costa marfil", name:"Costa de Marfil",  flag:"🇨🇮", total:20 },
+  { id:"ecuador",      name:"Ecuador",          flag:"🇪🇨", total:20 },
+  { id:"holanda",      name:"Holanda",          flag:"🇳🇱", total:20 },
+  { id:"japon",        name:"Japón",            flag:"🇯🇵", total:20 },
+  { id:"suecia",       name:"Suecia",           flag:"🇸🇪", total:20 },
+  { id:"tunez",        name:"Túnez",            flag:"🇹🇳", total:20 },
+  { id:"belgica",      name:"Bélgica",          flag:"🇧🇪", total:20 },
+  { id:"egipto",       name:"Egipto",           flag:"🇪🇬", total:20 },
+  { id:"iran",         name:"Irán",             flag:"🇮🇷", total:20 },
+  { id:"nueva zelan",  name:"Nueva Zelanda",    flag:"🇳🇿", total:20 },
+  { id:"españa",       name:"España",           flag:"🇪🇸", total:20 },
+  { id:"cabo verde",   name:"Cabo Verde",       flag:"🇨🇻", total:20 },
+  { id:"arabia saudi", name:"Arabia Saudita",   flag:"🇸🇦", total:20 },
+  { id:"uruguay",      name:"Uruguay",          flag:"🇺🇾", total:20 },
+  { id:"francia",      name:"Francia",          flag:"🇫🇷", total:20 },
+  { id:"senegal",      name:"Senegal",          flag:"🇸🇳", total:20 },
+  { id:"iraq",         name:"Irak",             flag:"🇮🇶", total:20 },
+  { id:"noruega",      name:"Noruega",          flag:"🇳🇴", total:20 },
+  { id:"argentina",    name:"Argentina",        flag:"🇦🇷", total:20 },
+  { id:"argelia",      name:"Argelia",          flag:"🇩🇿", total:20 },
+  { id:"austria",      name:"Austria",          flag:"🇦🇹", total:20 },
+  { id:"jordan",       name:"Jordania",         flag:"🇯🇴", total:20 },
+  { id:"portugal",     name:"Portugal",         flag:"🇵🇹", total:20 },
+  { id:"congo",        name:"Congo",            flag:"🇨🇬", total:20 },
+  { id:"uzbekistan",   name:"Uzbekistán",       flag:"🇺🇿", total:20 },
+  { id:"colombia",     name:"Colombia",         flag:"🇨🇴", total:20 },
+  { id:"inglaterra",   name:"Inglaterra",       flag:"🏴󠁧󠁢󠁥󠁮󠁧󠁿", total:20 },
+  { id:"croacia",      name:"Croacia",          flag:"🇭🇷", total:20 },
+  { id:"gana",         name:"Ghana",            flag:"🇬🇭", total:20 },
+  { id:"panama",       name:"Panamá",           flag:"🇵🇦", total:20 },
+  { id:"FWC",          name:"FWC Especiales",   flag:"🏆", total:19 },
+  { id:"Coca",         name:"Coca-Cola (CC)",   flag:"🥤", total:14 },
+];
+const TOTAL_STICKERS = SECTIONS.reduce((a, s) => a + s.total, 0); // 993
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let state   = {};   // { sectionId: Set<number> }
+let currentUser = null; // { id, username }
+let saveTimer = null;
+
+function stateToObj() {
+  const o = {}; SECTIONS.forEach(s => { o[s.id] = [...state[s.id]]; }); return o;
+}
+function applyObj(obj) {
+  SECTIONS.forEach(s => { state[s.id] = new Set(Array.isArray(obj[s.id]) ? obj[s.id] : []); });
+}
+function emptyState() {
+  SECTIONS.forEach(s => { state[s.id] = new Set(); });
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+let authMode = 'login';
+
+function switchAuthMode(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (mode === 'login')));
+  document.getElementById('confirmField').style.display = mode === 'register' ? '' : 'none';
+  document.getElementById('authBtn').textContent = mode === 'login' ? 'Entrar' : 'Crear cuenta';
+  document.getElementById('authError').textContent = '';
+}
+
+function setAuthError(msg) { document.getElementById('authError').textContent = msg; }
+
+async function doAuth() {
+  const username = document.getElementById('authUsername').value.trim().toLowerCase();
+  const password = document.getElementById('authPassword').value;
+  const confirm  = document.getElementById('authConfirm').value;
+  const btn      = document.getElementById('authBtn');
+
+  if (!username) { setAuthError('Ingresá tu nombre de usuario'); return; }
+  if (username.length < 3) { setAuthError('El usuario debe tener al menos 3 caracteres'); return; }
+  if (!/^[a-z0-9_]+$/.test(username)) { setAuthError('Solo letras, números y guión bajo'); return; }
+  if (!password) { setAuthError('Ingresá una contraseña'); return; }
+  if (password.length < 6) { setAuthError('La contraseña debe tener al menos 6 caracteres'); return; }
+  if (authMode === 'register' && password !== confirm) { setAuthError('Las contraseñas no coinciden'); return; }
+
+  btn.disabled = true;
+  btn.textContent = authMode === 'login' ? 'Entrando…' : 'Creando cuenta…';
+  setAuthError('');
+
+  const email = `${username}@panini.app`;
+
+  if (authMode === 'register') {
+    const { data, error } = await sb.auth.signUp({ email, password });
+    if (error) {
+      btn.disabled = false; switchAuthMode(authMode);
+      setAuthError(error.message.includes('already') ? 'Ese usuario ya existe' : error.message);
+      return;
+    }
+    // Create album row (empty state)
+    emptyState();
+    await sb.from('panini_album').insert({ user_id: data.user.id, username, state: stateToObj() });
+    currentUser = { id: data.user.id, username };
+  } else {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      btn.disabled = false; switchAuthMode(authMode);
+      setAuthError('Usuario o contraseña incorrectos');
+      return;
+    }
+    currentUser = { id: data.user.id, username };
+    // Load state from DB
+    const { data: row } = await sb.from('panini_album').select('state').eq('user_id', data.user.id).single();
+    if (row?.state) applyObj(row.state); else emptyState();
+  }
+
+  showApp();
+}
+
+// ── SYNC ──────────────────────────────────────────────────────────────────────
+function setSyncBadge(status, msg) {
+  const el = document.getElementById('syncBadge');
+  el.textContent = msg;
+  el.style.background = status === 'syncing' ? 'rgba(253,224,71,.2)' : status === 'error' ? 'rgba(239,68,68,.2)' : 'rgba(255,255,255,.15)';
+}
+
+async function saveToCloud() {
+  if (!currentUser) return;
+  setSyncBadge('syncing', '⟳ guardando…');
+  const { error } = await sb.from('panini_album').update({ state: stateToObj(), updated_at: new Date().toISOString() }).eq('user_id', currentUser.id);
+  setSyncBadge(error ? 'error' : 'ok', error ? '⚠ error' : '☁️ guardado');
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToCloud, 1200);
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────────────
+function calcStats(stateObj) {
+  let have = 0;
+  SECTIONS.forEach(s => { have += (stateObj[s.id] instanceof Set ? stateObj[s.id].size : (stateObj[s.id]?.length ?? 0)); });
+  return { have, total: TOTAL_STICKERS, miss: TOTAL_STICKERS - have, pct: Math.round(have / TOTAL_STICKERS * 100) };
+}
+
+function updateHeader() {
+  const { have, miss, pct } = calcStats(state);
+  document.getElementById('statHave').textContent = have;
+  document.getElementById('statMiss').textContent = miss;
+  document.getElementById('globalPct').textContent = pct + '%';
+  document.getElementById('globalBar').style.width = pct + '%';
+}
+
+// ── TOGGLE ────────────────────────────────────────────────────────────────────
+function toggleSticker(id, num, btn) {
+  if (state[id].has(num)) { state[id].delete(num); btn.classList.remove('have'); }
+  else { state[id].add(num); btn.classList.add('have'); }
+  scheduleSave();
+  const s = SECTIONS.find(x => x.id === id);
+  const have = state[id].size, pct = Math.round(have / s.total * 100);
+  const card = btn.closest('.card');
+  card.querySelector('.card-pct').textContent   = pct + '%';
+  card.querySelector('.card-count').textContent = `${have}/${s.total} · faltan ${s.total - have}`;
+  card.querySelector('.card-prog-fill').style.width = pct + '%';
+  updateHeader();
+}
+
+// ── RENDER ALBUM ──────────────────────────────────────────────────────────────
+function renderGrid() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const s = document.getElementById('sortSelect').value;
+  let sections = SECTIONS.filter(x => !q || x.name.toLowerCase().includes(q) || x.id.includes(q));
+  if (s === 'alpha') sections = [...sections].sort((a,b) => a.name.localeCompare(b.name,'es'));
+  if (s === 'asc')   sections = [...sections].sort((a,b) => (b.total - state[b.id].size) - (a.total - state[a.id].size));
+  if (s === 'desc')  sections = [...sections].sort((a,b) => state[b.id].size/b.total - state[a.id].size/a.total);
+
+  document.getElementById('grid').innerHTML = sections.length === 0
+    ? `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-soft)">Sin resultados</div>`
+    : sections.map(s => {
+        const have = state[s.id].size, pct = Math.round(have/s.total*100);
+        return `<div class="card">
+          <div class="card-header">
+            <div class="card-flag">${s.flag}</div>
+            <div class="card-info">
+              <div class="card-name">${s.name}</div>
+              <div class="card-count">${have}/${s.total} · faltan ${s.total-have}</div>
+            </div>
+            <div class="card-pct">${pct}%</div>
+          </div>
+          <div class="card-prog"><div class="card-prog-fill" style="width:${pct}%"></div></div>
+          <div class="stickers">${Array.from({length:s.total},(_,i)=>i+1).map(n =>
+            `<button class="sticker${state[s.id].has(n)?' have':''}" onclick="toggleSticker('${s.id}',${n},this)">${n}</button>`
+          ).join('')}</div>
+        </div>`;
+      }).join('');
+}
+
+// ── FAMILIA ───────────────────────────────────────────────────────────────────
+async function loadFamilia() {
+  document.getElementById('familiaList').innerHTML = '<div class="familia-empty">Cargando…</div>';
+  const { data, error } = await sb.from('panini_album').select('username, state').order('updated_at', { ascending: false });
+  if (error || !data?.length) {
+    document.getElementById('familiaList').innerHTML = '<div class="familia-empty">No hay datos aún</div>';
+    return;
+  }
+  // Sort by completion %
+  const rows = data.map(r => {
+    const have = Object.values(r.state).reduce((acc, arr) => acc + arr.length, 0);
+    const pct  = Math.round(have / TOTAL_STICKERS * 100);
+    return { username: r.username, have, pct };
+  }).sort((a,b) => b.pct - a.pct);
+
+  document.getElementById('familiaList').innerHTML = rows.map((r, i) => {
+    const isMe = r.username === currentUser.username;
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+    return `<div class="familia-card">
+      <div class="familia-avatar">${r.username[0]}</div>
+      <div class="familia-info">
+        <div class="familia-name">${medal} ${r.username}${isMe ? '<span class="familia-you">vos</span>':''}
+        </div>
+        <div class="familia-sub">${r.have} figuritas · ${TOTAL_STICKERS - r.have} faltan</div>
+        <div class="familia-prog-wrap"><div class="familia-prog-fill" style="width:${r.pct}%"></div></div>
+      </div>
+      <div class="familia-pct">${r.pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `tab-${tab}`));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+  if (tab === 'familia') loadFamilia();
+}
+
+// ── EXPORT / IMPORT ───────────────────────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(stateToObj(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `panini-${currentUser.username}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = async e => {
+    try {
+      const obj = JSON.parse(await e.target.files[0].text());
+      applyObj(obj);
+      await saveToCloud();
+      renderGrid(); updateHeader();
+    } catch { alert('Archivo inválido'); }
+  };
+  input.click();
+}
+
+function resetConfirm() {
+  if (confirm('¿Reiniciar tu album a cero? Esto borrará TODAS tus figuritas.')) {
+    emptyState(); saveToCloud(); renderGrid(); updateHeader();
+  }
+}
+
+// ── LOGOUT ───────────────────────────────────────────────────────────────────
+function confirmLogout() {
+  if (confirm(`Salir de la cuenta de "${currentUser.username}"?`)) logout();
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  currentUser = null; emptyState();
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('authUsername').value = '';
+  document.getElementById('authPassword').value = '';
+  switchAuthMode('login');
+}
+
+// ── SHOW APP ──────────────────────────────────────────────────────────────────
+function showApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display  = 'flex';
+  document.getElementById('headerUser').textContent   = currentUser.username;
+  document.getElementById('userInitial').textContent  = currentUser.username[0].toUpperCase();
+  renderGrid();
+  updateHeader();
+  setSyncBadge('ok', '☁️ guardado');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  // Check existing session
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    const username = session.user.email.replace('@panini.app', '');
+    currentUser = { id: session.user.id, username };
+    const { data: row } = await sb.from('panini_album').select('state').eq('user_id', session.user.id).single();
+    if (row?.state) applyObj(row.state); else emptyState();
+    document.getElementById('splash').style.opacity = '0';
+    setTimeout(() => { document.getElementById('splash').style.display = 'none'; showApp(); }, 400);
+  } else {
+    document.getElementById('splash').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('splash').style.display = 'none';
+      document.getElementById('authScreen').style.display = 'flex';
+    }, 400);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
